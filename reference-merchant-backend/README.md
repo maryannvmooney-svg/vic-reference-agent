@@ -104,6 +104,17 @@ rm -rf data/
 python create_sample_data.py
 ```
 
+### Running Tests
+
+The pytest suite covers the products, cart and orders routes, including `X-Api-Key` enforcement. It seeds a throwaway database with `create_sample_data.py` in a temporary directory and sets a test-only `MERCHANT_API_KEY`, so your local `data/` is never touched.
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The same tests run on every pull request via `.github/workflows/merchant-backend-tests.yml`.
+
 ## Tech Stack
 
 - **Runtime**: Python 3.12
