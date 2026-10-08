@@ -28,15 +28,18 @@ class Product(ProductBase):
         from_attributes = True
 
 # Cart schemas
+MIN_CART_ITEM_QUANTITY = 1
+MAX_CART_ITEM_QUANTITY = 99
+
 class CartItemBase(BaseModel):
     product_id: int
     quantity: int
 
 class CartItemCreate(CartItemBase):
-    pass
+    quantity: int = Field(ge=MIN_CART_ITEM_QUANTITY, le=MAX_CART_ITEM_QUANTITY)
 
 class CartItemUpdate(BaseModel):
-    quantity: int
+    quantity: int = Field(ge=MIN_CART_ITEM_QUANTITY, le=MAX_CART_ITEM_QUANTITY)
 
 class CartItem(CartItemBase):
     id: int
