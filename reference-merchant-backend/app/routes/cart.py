@@ -20,7 +20,7 @@ from app.models.models import (
     OrderItem as OrderItemModel)
 from app.schemas import (
     Cart, CartItemCreate, CartItemUpdate,
-    Message)
+    Message, MAX_CART_ITEM_QUANTITY)
 from datetime import datetime
 import secrets
 import uuid
@@ -122,8 +122,14 @@ async def add_item_to_cart(
     existing_item = existing_item_result.scalar_one_or_none()
 
     if existing_item:
-        # Update quantity
-        existing_item.quantity += item.quantity
+        new_quantity = existing_item.quantity + item.quantity
+        if new_quantity > MAX_CART_ITEM_QUANTITY:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Quantity cannot exceed {MAX_CART_ITEM_QUANTITY} per item "
+                       f"(cart already has {existing_item.quantity})"
+            )
+        existing_item.quantity = new_quantity
     else:
         # Add new item
         cart_item = CartItemModel(
@@ -179,11 +185,7 @@ async def update_cart_item(
     if not cart_item:
         raise HTTPException(status_code=404, detail="Item not found in cart")
 
-    if item_update.quantity <= 0:
-        # Remove item if quantity is 0 or negative
-        await db.delete(cart_item)
-    else:
-        cart_item.quantity = item_update.quantity
+    cart_item.quantity = item_update.quantity
 
     await db.commit()
     await db.refresh(cart, attribute_names=['items'])
