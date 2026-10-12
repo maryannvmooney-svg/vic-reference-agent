@@ -88,12 +88,57 @@ def test_update_item_quantity(client, cart):
     assert body["subtotal"] == pytest.approx(COFFEE_MAKER_PRICE * 5)
 
 
-def test_update_quantity_to_zero_removes_item(client, cart):
-    session_id = cart["session_id"]
-    add_item(client, session_id, COFFEE_MAKER_ID, 1)
-    response = client.put(f"/api/cart/{session_id}/items/{COFFEE_MAKER_ID}", json={"quantity": 0})
+@pytest.mark.parametrize("quantity", [1, 99])
+def test_add_item_accepts_quantity_limits(client, cart, quantity):
+    response = add_item(client, cart["session_id"], COFFEE_MAKER_ID, quantity)
     assert response.status_code == 200
-    assert response.json()["items"] == []
+    assert response.json()["items"][0]["quantity"] == quantity
+
+
+@pytest.mark.parametrize("quantity", [0, -1, 100, 1000])
+def test_add_item_rejects_out_of_range_quantity(client, cart, quantity):
+    session_id = cart["session_id"]
+    response = add_item(client, session_id, COFFEE_MAKER_ID, quantity)
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "quantity"]
+    assert client.get(f"/api/cart/{session_id}").json()["items"] == []
+
+
+def test_adding_same_product_up_to_limit_is_allowed(client, cart):
+    add_item(client, cart["session_id"], HEADPHONES_ID, 90)
+    response = add_item(client, cart["session_id"], HEADPHONES_ID, 9)
+    assert response.status_code == 200
+    assert response.json()["items"][0]["quantity"] == 99
+
+
+def test_adding_same_product_beyond_limit_is_rejected(client, cart):
+    session_id = cart["session_id"]
+    add_item(client, session_id, HEADPHONES_ID, 90)
+    response = add_item(client, session_id, HEADPHONES_ID, 10)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Quantity cannot exceed 99 per item (cart already has 90)"
+    # The existing quantity is left unchanged.
+    assert client.get(f"/api/cart/{session_id}").json()["items"][0]["quantity"] == 90
+
+
+@pytest.mark.parametrize("quantity", [1, 99])
+def test_update_item_accepts_quantity_limits(client, cart, quantity):
+    session_id = cart["session_id"]
+    add_item(client, session_id, COFFEE_MAKER_ID, 5)
+    response = client.put(f"/api/cart/{session_id}/items/{COFFEE_MAKER_ID}", json={"quantity": quantity})
+    assert response.status_code == 200
+    assert response.json()["items"][0]["quantity"] == quantity
+
+
+@pytest.mark.parametrize("quantity", [0, -1, 100])
+def test_update_item_rejects_out_of_range_quantity(client, cart, quantity):
+    session_id = cart["session_id"]
+    add_item(client, session_id, COFFEE_MAKER_ID, 5)
+    response = client.put(f"/api/cart/{session_id}/items/{COFFEE_MAKER_ID}", json={"quantity": quantity})
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "quantity"]
+    # The item and its quantity are left unchanged.
+    assert client.get(f"/api/cart/{session_id}").json()["items"][0]["quantity"] == 5
 
 
 def test_update_item_not_in_cart_returns_404(client, cart):
